@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "hist-prototype"
+version = "0.1.0"
+description = ""
+authors = ["Noah Pederson <noah@packetlost.dev>"]
+readme = "README.md"
+packages = [{include = "hist_prototype"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
