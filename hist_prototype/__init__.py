@@ -1,13 +1,15 @@
 from collections import deque
 from dataclasses import dataclass
 from enum import IntFlag
-from functools import partial
 from threading import RLock
 from typing import (Generic, Iterable, List, Optional, Protocol, Tuple,
                     TypeVar, Union, cast)
 from weakref import ReferenceType, ref
 
 from .util import serialize_int
+
+# The maximum number of children BTreeLNode's are allowed to have
+MAX_CHILDREN = 16
 
 TX = int
 Offset = int
@@ -56,11 +58,7 @@ class BTreeENode:
     depth: int = 1
 
     def search(self: "BTreeENode", search_key: bytes) -> Optional[BTreeNode]:
-        if len(self.children) == 0:
-            return None
-
-    def put(self: "BTreeENode", key: bytes, value: bytes, delete: bool = False) -> None:
-        ...
+        return search_intermediate_node(self, search_key)
 
 
 class BTreeLNodeFlags(IntFlag):
@@ -100,7 +98,7 @@ class BTreeLNode(Generic[T]):
         # A weak reference to the stored key's bytes
         key: bytes,
         # A weak reference to the stored value's bytes
-        value: ReferenceType[bytes],
+        value: bytes,
         # Flags are xored to DEFAULT_ARGS, meaning you must explicitly
         # disable default flags by setting them as flags. Yes, this may be
         # slightly confusing behavior
@@ -132,7 +130,7 @@ class BTreeLNode(Generic[T]):
                 HistoryRecord(tx=self.tx, value=self.value, delete=delete)
             )
             self.tx = tx
-            self.value = ref(value)
+            self.value = value
             self.offset = offset
             return self.to_write_req(value)
 
@@ -141,6 +139,10 @@ class BTreeLNode(Generic[T]):
             return WriteRequest(
                 offset=self.offset, value=value, tx=self.tx, delete=self.delete
             )
+
+
+K = TypeVar("K", bound=Serializable)
+V = TypeVar("V", bound=Serializable)
 
 
 class BHistoryTree:
@@ -157,6 +159,46 @@ class BHistoryTree:
             self.intermediate_nodes.append(BTreeENode(max_key=b"", children=[]))
 
         self.head = self.intermediate_nodes[0]
+
+    # TODO: merge search functionality from put and get into a generic `search` function
+    def put(self: "BHistoryTree", key: K, value: V) -> None:
+        key_bytes = key.serialize()
+        node_stack: List[BTreeENode] = [self.head]
+        while node_stack[-1].depth > 1:
+            new_node = search_intermediate_node(node_stack[-1], key_bytes)
+            if new_node is None:
+                raise RuntimeError("Unreachable code. This is a bug!!!")
+            node_stack.append(new_node)
+        assert isinstance(node_stack[-1], BTreeENode)
+        assert node_stack[-1].depth == 1
+        # New key, let's create a new BTreeLNode
+        new_node = BTreeLNode(
+            key=key_bytes,
+            value=value.serialize(),
+            init_flags=BTreeLNodeFlags.PERSIST_HISTORY,
+            history=[],
+            history_idx=0,
+            current_offset=0,
+            history_offset=0,
+        )
+        # TODO: handle full nodes recursively
+        insert_into_intermediate_node(node_stack[-1], new_node)
+
+
+    def get(self: "BHistoryTree", key: K) -> bytes:
+        key_bytes = key.serialize()
+        node_stack: List[BTreeENode] = [self.head]
+        while node_stack[-1].depth > 1:
+            new_node = search_intermediate_node(node_stack[-1], key_bytes)
+            if new_node is None:
+                raise RuntimeError("Unreachable code. This is a bug!!!")
+            node_stack.append(new_node)
+        assert isinstance(node_stack[-1], BTreeENode)
+        assert node_stack[-1].depth == 1
+        leaf_node = node_stack[-1].search(key_bytes)
+        if leaf_node is not None:
+            return leaf_node.value
+        return None
 
 
 def split_intermediate_node(node: BTreeENode) -> BTreeENode:
@@ -177,6 +219,8 @@ def search_intermediate_node(
     node: BTreeENode, search_key: bytes
 ) -> Optional[BTreeNode]:
     """Searches a node's children for a node with the matching search key."""
+    if len(node.children) == 0:
+        return None
     # If the depth is greater than 1, the children will be `BTreeENode`s
     if node.depth > 1:
         for child in node.children:
@@ -192,9 +236,61 @@ def search_intermediate_node(
                 return None
     return None
 
+class NodeFullError(RuntimeError):
+    ...
+
+def insert_into_intermediate_node(
+    node: BTreeENode,
+    new_node: BTreeNode,
+) -> int:
+    if len(node.children) + 1 >= MAX_CHILDREN:
+        raise NodeFullError("Node is full, cannot insert another node")
+    if node.depth == 1:
+        new_node = cast(BTreeLNode, new_node)
+        assert isinstance(new_node, BTreeLNode)
+        for i, child in enumerate(node.children):
+            child = cast(BTreeLNode, child)
+            # If the keys match, replace the node entirely
+            if child.key == new_node.key:
+                # TODO: this is the wrong behavior if we want to retain history
+                node.children[i] = new_node
+                return i
+            # If the current childs key is of higher order than the node to insert,
+            # insert the node at the childs position, moving everything after 1 index
+            # later
+            if child.key > new_node.key:
+                node.children.insert(i, new_node)
+                return i
+        # If we get to this point, it means the new node is probably the new max
+        node.children.append(new_node)
+        return len(node.children)
+    else:
+        new_node = cast(BTreeENode, new_node)
+        assert isinstance(node, BTreeENode)
+        for i, child in enumerate(node.children):
+            child = cast(BTreeENode, child)
+            if child.max_key == new_node.max_key:
+                # TODO: this is the wrong behavior if we want to retain history
+                node.children[i] = new_node
+                return i
+            if child.max_key > new_node.max_key:
+                node.children.insert(i, new_node)
+                return i
+        node.children.append(new_node)
+        return len(node.children)
+
+@dataclass(frozen=True)
+class Bytes:
+    inner: bytes
+
+    def serialize(self) -> bytes:
+        return self.inner
+
+
 
 def main():
     btree = BHistoryTree([], [])
+    btree.put(Bytes(b"key1"), Bytes(b"value1"))
 
 
 if __name__ == "__main__":
