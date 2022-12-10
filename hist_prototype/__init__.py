@@ -2,8 +2,17 @@ from collections import deque
 from dataclasses import dataclass
 from enum import IntFlag
 from threading import RLock
-from typing import (Generic, Iterable, List, Optional, Protocol, Tuple,
-                    TypeVar, Union, cast)
+from typing import (
+    Generic,
+    Iterable,
+    List,
+    Optional,
+    Protocol,
+    Tuple,
+    TypeVar,
+    Union,
+    cast,
+)
 from weakref import ReferenceType, ref
 
 from .util import serialize_int
@@ -182,8 +191,10 @@ class BHistoryTree:
             history_offset=0,
         )
         # TODO: handle full nodes recursively
-        insert_into_intermediate_node(node_stack[-1], new_node)
-
+        try:
+            insert_into_intermediate_node(node_stack[-1], new_node)
+        except NodeFullError:
+            recursively_split_node(node_stack.pop(), new_node, node_stack)
 
     def get(self: "BHistoryTree", key: K) -> bytes:
         key_bytes = key.serialize()
@@ -236,15 +247,18 @@ def search_intermediate_node(
                 return None
     return None
 
+
 class NodeFullError(RuntimeError):
-    ...
+    def __init__(self, msg="Node is full, cannot insert another node", *args) -> None:
+        super().__init__(msg, *args)
+
 
 def insert_into_intermediate_node(
     node: BTreeENode,
     new_node: BTreeNode,
 ) -> int:
     if len(node.children) + 1 >= MAX_CHILDREN:
-        raise NodeFullError("Node is full, cannot insert another node")
+        raise NodeFullError()
     if node.depth == 1:
         new_node = cast(BTreeLNode, new_node)
         assert isinstance(new_node, BTreeLNode)
@@ -279,13 +293,33 @@ def insert_into_intermediate_node(
         node.children.append(new_node)
         return len(node.children)
 
+def recursively_splitcert_node(
+    node: BTreeENode,
+    new_node: BTreeNode,
+    node_stack: List[BTreeENode],
+) -> None:
+    """Recursively splits a node, pushing the new node to the next level up."""
+    new_node = split_intermediate_node(node)
+    if len(node_stack) == 0:
+        # We've reached the top of the tree, create a new root node
+        new_root = BTreeENode(
+            children=[node, new_node],
+            depth=node.depth + 1,
+            max_key=new_node.max_key,
+        )
+        return new_root
+    else:
+        # We have more levels to go, insert the new node into the parent
+        parent = node_stack.pop()
+        insert_into_intermediate_node(parent, new_node)
+        return recursively_split_node(parent, new_node, node_stack)
+
 @dataclass(frozen=True)
 class Bytes:
     inner: bytes
 
     def serialize(self) -> bytes:
         return self.inner
-
 
 
 def main():
