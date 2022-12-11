@@ -1,4 +1,5 @@
 from typing import Protocol, TypeVar, Tuple, Dict, Any
+from dataclasses import dataclass
 
 
 class Serializable(Protocol):
@@ -12,6 +13,14 @@ V = TypeVar("V", bound=Serializable)
 TX = int
 Offset = int
 
+# Helper types
+
+@dataclass(frozen=True)
+class Bytes:
+    inner: bytes
+
+    def serialize(self) -> bytes:
+        return self.inner
 
 # Errors
 class NodeFullError(RuntimeError):
