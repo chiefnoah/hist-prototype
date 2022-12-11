@@ -69,6 +69,9 @@ class BTreeENode:
     def search(self: "BTreeENode", search_key: bytes) -> Optional[BTreeNode]:
         return search_intermediate_node(self, search_key)
 
+    @property
+    def full(self) -> bool:
+        return len(self.children) >= MAX_CHILDREN
 
 class BTreeLNodeFlags(IntFlag):
     DELETED: int = 1
@@ -190,13 +193,31 @@ class BHistoryTree:
             current_offset=0,
             history_offset=0,
         )
+        self.leaf_nodes.append(new_node)
         # TODO: handle full nodes recursively
         try:
             insert_into_intermediate_node(node_stack[-1], new_node)
         except NodeFullError:
-            recursively_split_node(node_stack.pop(), new_node, node_stack)
+            recursively_splitcert_node(new_node, node_stack)
 
-    def get(self: "BHistoryTree", key: K) -> bytes:
+    def split_nodes(self, node_stack: List[BTreeENode]) -> None:
+        """Splits the nodes in the provided stack such that the bottom node is not full."""
+        if not node_stack[-1].full:
+            return
+        old_parent = node_stack.pop()
+        new_node = split_intermediate_node(old_parent)
+        # Maybe split the next layer up
+        if len(node_stack) == 0:
+            # We've reached the root, so we need to create a new root
+            new_root = BTreeENode(max_key=new_node.max_key, children=[old_parent, new_node])
+            self.head = new_root
+            self.intermediate_nodes.insert(0, new_root)
+            return
+        self.split_nodes(node_stack)
+
+
+
+    def get(self: "BHistoryTree", key: K) -> Optional[bytes]:
         key_bytes = key.serialize()
         node_stack: List[BTreeENode] = [self.head]
         while node_stack[-1].depth > 1:
@@ -257,7 +278,7 @@ def insert_into_intermediate_node(
     node: BTreeENode,
     new_node: BTreeNode,
 ) -> int:
-    if len(node.children) + 1 >= MAX_CHILDREN:
+    if node.full:
         raise NodeFullError()
     if node.depth == 1:
         new_node = cast(BTreeLNode, new_node)
@@ -294,25 +315,38 @@ def insert_into_intermediate_node(
         return len(node.children)
 
 def recursively_splitcert_node(
-    node: BTreeENode,
-    new_node: BTreeNode,
+    node_to_insert: BTreeNode,
     node_stack: List[BTreeENode],
-) -> None:
-    """Recursively splits a node, pushing the new node to the next level up."""
-    new_node = split_intermediate_node(node)
+) -> BTreeENode:
+    """Recursively splits nodes as necessary, inserting the new node into the parent."""
     if len(node_stack) == 0:
-        # We've reached the top of the tree, create a new root node
-        new_root = BTreeENode(
-            children=[node, new_node],
-            depth=node.depth + 1,
-            max_key=new_node.max_key,
-        )
-        return new_root
+        raise ValueError("Node stack is empty, we cannot split.")
+    old_parent = node_stack.pop()
+    if not old_parent.full:
+        insert_into_intermediate_node(old_parent, node_to_insert)
+        # Return the root node
+        return node_stack[0]
+    # Otherwise we split
+    new_node = split_intermediate_node(old_parent)
+    if isinstance(node_to_insert, BTreeENode):
+        k = node_to_insert.max_key
+    elif isinstance(node_to_insert, BTreeLNode):
+        k = node_to_insert.key
     else:
-        # We have more levels to go, insert the new node into the parent
-        parent = node_stack.pop()
-        insert_into_intermediate_node(parent, new_node)
-        return recursively_split_node(parent, new_node, node_stack)
+        raise ValueError("Unknown node type")
+    # Insert the node we wanted to insert into the proper parent
+    if k > old_parent.max_key:
+        insert_into_intermediate_node(new_node, node_to_insert)
+    else:
+        insert_into_intermediate_node(old_parent, node_to_insert)
+    if len(node_stack) == 0:
+        # If we have no more parents, we need to create a new root node
+        return BTreeENode(
+            children=[old_parent, new_node], depth=old_parent.depth + 1, max_key=new_node.max_key
+        )
+    # Insert the newly allocaed parent node into it's parent
+    return recursively_splitcert_node(new_node, node_stack)
+    
 
 @dataclass(frozen=True)
 class Bytes:
