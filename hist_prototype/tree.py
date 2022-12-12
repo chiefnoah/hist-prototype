@@ -72,15 +72,16 @@ class BHistoryTree(Generic[K, V]):
             return
         self.split_nodes(node_stack)
 
-    def get(self: "BHistoryTree", key: K) -> Optional[bytes]:
+    def get(self: "BHistoryTree[K, V]", key: K) -> Optional[bytes]:
         key_bytes = key.serialize()
-        node_stack: List[BTreeENode] = [self.head]
+        node_stack: List[IntermediateNode[V]] = [self.head]
         while node_stack[-1].depth > 1:
-            new_node = search_intermediate_node(node_stack[-1], key_bytes)
+            new_node = node_stack[-1].search(key_bytes)
             if new_node is None:
                 raise RuntimeError("Unreachable code. This is a bug!!!")
+            assert isinstance(new_node, IntermediateNode)
             node_stack.append(new_node)
-        assert isinstance(node_stack[-1], BTreeENode)
+        assert isinstance(node_stack[-1], IntermediateNode)
         assert node_stack[-1].depth == 1
         leaf_node = node_stack[-1].search(key_bytes)
         if leaf_node is not None:
