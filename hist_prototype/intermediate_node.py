@@ -74,6 +74,7 @@ def insert_into_intermediate_node(
                 return i
         # If we get to this point, it means the new node is probably the new max
         node.children.append(new_node)
+        node.max_key = new_node.key
         return len(node.children)
     else:
         new_node = cast(IntermediateNode[V], new_node)
@@ -88,6 +89,7 @@ def insert_into_intermediate_node(
                 node.children.insert(i, new_node)
                 return i
         node.children.append(new_node)
+        node.max_key = new_node.max_key
         return len(node.children)
 
 def split_intermediate_node(node: IntermediateNode[V]) -> IntermediateNode[V]:
