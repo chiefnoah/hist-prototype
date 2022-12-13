@@ -1,5 +1,6 @@
 from collections import deque
 from typing import (
+    Deque,
     Iterable,
     List,
     Optional,
@@ -13,8 +14,8 @@ from .types import K, V, NodeFullError
 
 
 class BHistoryTree(Generic[K, V]):
-    leaf_nodes: deque[LeafNode[V]]
-    intermediate_nodes: deque[IntermediateNode[V]]
+    leaf_nodes: Deque[LeafNode[V]]
+    intermediate_nodes: Deque[IntermediateNode[V]]
     head: IntermediateNode[V]
     current_tx: int
 
