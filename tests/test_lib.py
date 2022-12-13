@@ -47,7 +47,9 @@ def test_split_nodes():
 
 def test_tree_split_new_root():
     root = IntermediateNode[Bytes](
-        max_key=b"zzz9", children=[MagicMock(spec=LeafNode, key=b'xyz')] * MAX_CHILDREN, depth=1
+        max_key=b"zzz9",
+        children=[MagicMock(spec=LeafNode, key=b"xyz")] * MAX_CHILDREN,
+        depth=1,
     )
     # Create a tree with a root that is full
     tree = BHistoryTree[Bytes, Bytes](
@@ -57,6 +59,7 @@ def test_tree_split_new_root():
     result = tree.get(Bytes(b"abc"))
     assert result is not None
     assert result == b"val"
+
 
 def test_insert_saves_history():
     btree = BHistoryTree[Bytes, Bytes]([], [])

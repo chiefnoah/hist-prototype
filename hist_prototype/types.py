@@ -15,12 +15,14 @@ Offset = int
 
 # Helper types
 
+
 @dataclass(frozen=True)
 class Bytes:
     inner: bytes
 
     def serialize(self) -> bytes:
         return self.inner
+
 
 # Errors
 class NodeFullError(RuntimeError):

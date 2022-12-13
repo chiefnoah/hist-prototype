@@ -6,6 +6,7 @@ from .types import V, NodeFullError
 
 BTreeNode = Union["IntermediateNode[V]", LeafNode[V]]
 
+
 @dataclass
 class IntermediateNode(Generic[V]):
     # The maximum key midfix
@@ -13,10 +14,14 @@ class IntermediateNode(Generic[V]):
     children: List[BTreeNode[V]]
     depth: int = 1
 
-    def search(self: "IntermediateNode[V]", search_key: bytes) -> Optional[BTreeNode[V]]:
+    def search(
+        self: "IntermediateNode[V]", search_key: bytes
+    ) -> Optional[BTreeNode[V]]:
         return search_intermediate_node(self, search_key)
 
-    def node_for_insert(self: "IntermediateNode[V]", search_key: bytes) -> "IntermediateNode[V]":
+    def node_for_insert(
+        self: "IntermediateNode[V]", search_key: bytes
+    ) -> "IntermediateNode[V]":
         return node_for_insert(self, search_key)
 
     def insert(self: "IntermediateNode[V]", node: BTreeNode[V]) -> None:
@@ -28,6 +33,7 @@ class IntermediateNode(Generic[V]):
     @property
     def full(self) -> bool:
         return len(self.children) >= MAX_CHILDREN
+
 
 def search_intermediate_node(
     node: IntermediateNode[V], search_key: bytes
@@ -49,6 +55,7 @@ def search_intermediate_node(
             elif child.key > search_key:
                 return None
     return None
+
 
 def insert_into_intermediate_node(
     node: IntermediateNode[V],
@@ -88,6 +95,7 @@ def insert_into_intermediate_node(
         node.max_key = new_node.max_key
         return len(node.children)
 
+
 def split_intermediate_node(node: IntermediateNode[V]) -> IntermediateNode[V]:
     """Splits the provided node into a newly allocated node, modifying the existing node
     in-place."""
@@ -97,7 +105,9 @@ def split_intermediate_node(node: IntermediateNode[V]) -> IntermediateNode[V]:
         max_key = cast(IntermediateNode[V], new_node_children[-1]).max_key
     else:
         max_key = cast(LeafNode[V], new_node_children[-1]).key
-    new_node = IntermediateNode(children=new_node_children, depth=node.depth, max_key=max_key)
+    new_node = IntermediateNode(
+        children=new_node_children, depth=node.depth, max_key=max_key
+    )
     node.children = node.children[0:mid_point]
     if node.depth > 1:
         node.max_key = node.children[-1].max_key
@@ -105,7 +115,10 @@ def split_intermediate_node(node: IntermediateNode[V]) -> IntermediateNode[V]:
         node.max_key = node.children[-1].key
     return new_node
 
-def node_for_insert(node: IntermediateNode[V], search_key: bytes) -> IntermediateNode[V]:
+
+def node_for_insert(
+    node: IntermediateNode[V], search_key: bytes
+) -> IntermediateNode[V]:
     """Searches a node's children for the correct node to insert into."""
     if len(node.children) == 0:
         return None  # this should never happen
@@ -119,5 +132,5 @@ def node_for_insert(node: IntermediateNode[V], search_key: bytes) -> Intermediat
         # Return the last child
         return node.children[-1]
     else:
-        return node 
+        return node
     return None

@@ -8,9 +8,11 @@ from .types import V, TX
 # The maximum number of children BTreeLNode's are allowed to have
 MAX_CHILDREN = 16
 
+
 class LeafNodeFlags(IntFlag):
     DELETED: int = 1  # type: ignore
     PERSIST_HISTORY: int = 1 << 1  # type: ignore
+
 
 @dataclass
 class HistoryRecord:

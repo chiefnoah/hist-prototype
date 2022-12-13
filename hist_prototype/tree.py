@@ -51,7 +51,7 @@ class BHistoryTree(Generic[K, V]):
             assert isinstance(maybe_leaf, LeafNode)
             # don't do anything with the WriteRequest for now
             _ = maybe_leaf.add_record(offset=0, value=value.serialize(), tx=self.tx)
-            self.tx += 1 # increment the tx counter
+            self.tx += 1  # increment the tx counter
             return
         # New key, let's create a new BTreeLNode
         new_node = LeafNode(
@@ -76,7 +76,7 @@ class BHistoryTree(Generic[K, V]):
         except NodeFullError:
             self.split_nodes(node_stack)
             return self.put(key, value)
-        self.tx += 1 # increment the tx counter
+        self.tx += 1  # increment the tx counter
         self.leaf_nodes.append(new_node)
 
     def split_nodes(self, node_stack: List[IntermediateNode[V]]) -> None:
