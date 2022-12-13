@@ -66,6 +66,8 @@ class LeafNode(Generic[V]):
         key: bytes,
         # A weak reference to the stored value's bytes
         value: bytes,
+        # The tranasaction instant for the most recent write
+        tx: int,
         # Flags are xored to DEFAULT_ARGS, meaning you must explicitly
         # disable default flags by setting them as flags. Yes, this may be
         # slightly confusing behavior
@@ -81,6 +83,7 @@ class LeafNode(Generic[V]):
         history_offset: int = 0,
     ) -> None:
         self.key = key
+        self.tx = tx
         self.flags = init_flags ^ self.__class__.DEFAULT_FLAGS
         self.value = value
         self.history = list(history)
@@ -88,6 +91,7 @@ class LeafNode(Generic[V]):
         self.current_offset = current_offset
         self.history_offset = history_offset
         self.lock = RLock()
+        self.delete = False
 
     def add_record(
         self, offset: int, value: bytes, tx: int, delete: bool = False

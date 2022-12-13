@@ -16,6 +16,9 @@ class IntermediateNode(Generic[V]):
     def search(self: "IntermediateNode[V]", search_key: bytes) -> Optional[BTreeNode[V]]:
         return search_intermediate_node(self, search_key)
 
+    def node_for_insert(self: "IntermediateNode[V]", search_key: bytes) -> "IntermediateNode[V]":
+        return node_for_insert(self, search_key)
+
     def insert(self: "IntermediateNode[V]", node: BTreeNode[V]) -> None:
         insert_into_intermediate_node(self, node)
 
@@ -36,7 +39,7 @@ def search_intermediate_node(
     if node.depth > 1:
         for child in node.children:
             child = cast(IntermediateNode[V], child)
-            if child.max_key > search_key:
+            if child.max_key >= search_key:
                 return child
     else:
         for child in node.children:
@@ -59,13 +62,8 @@ def insert_into_intermediate_node(
         for i, child in enumerate(node.children):
             child = cast(LeafNode[V], child)
             # If the keys match, replace the node entirely
-            try:
-                if child.key == new_node.key:
-                    # TODO: this is the wrong behavior if we want to retain history
-                    node.children[i] = new_node
-                    return i
-            except AttributeError:
-                raise RuntimeError("Unreachable code. This is a bug!!!")
+            if child.key == new_node.key:
+                raise ValueError("Unreachable code. This is a bug!!!")
             # If the current childs key is of higher order than the node to insert,
             # insert the node at the childs position, moving everything after 1 index
             # later
@@ -82,9 +80,7 @@ def insert_into_intermediate_node(
         for i, child in enumerate(node.children):
             child = cast(IntermediateNode[V], child)
             if child.max_key == new_node.max_key:
-                # TODO: this is the wrong behavior if we want to retain history
-                node.children[i] = new_node
-                return i
+                raise ValueError("Unreachable code. This is a bug!!!")
             if child.max_key > new_node.max_key:
                 node.children.insert(i, new_node)
                 return i
@@ -108,3 +104,20 @@ def split_intermediate_node(node: IntermediateNode[V]) -> IntermediateNode[V]:
     else:
         node.max_key = node.children[-1].key
     return new_node
+
+def node_for_insert(node: IntermediateNode[V], search_key: bytes) -> IntermediateNode[V]:
+    """Searches a node's children for the correct node to insert into."""
+    if len(node.children) == 0:
+        return None  # this should never happen
+    # If the depth is greater than 1, the children will be `BTreeENode`s
+    if node.depth > 1:
+        for child in node.children:
+            child = cast(IntermediateNode[V], child)
+            if child.max_key >= search_key:
+                return child
+        # If we get to this point, it means the new node to be inserted is probably the new max
+        # Return the last child
+        return node.children[-1]
+    else:
+        return node 
+    return None

@@ -4,19 +4,25 @@ from typing import (
     List,
     Optional,
     Generic,
+    cast,
 )
 
 from .leaf_node import LeafNode, LeafNodeFlags
 from .intermediate_node import IntermediateNode
 from .types import K, V, NodeFullError
 
+
 class BHistoryTree(Generic[K, V]):
     leaf_nodes: deque[LeafNode[V]]
     intermediate_nodes: deque[IntermediateNode[V]]
     head: IntermediateNode[V]
+    current_tx: int
 
     def __init__(
-        self, leaf_nodes: Iterable[LeafNode[V]], intermediate_nodes: Iterable[IntermediateNode[V]]
+        self,
+        leaf_nodes: Iterable[LeafNode[V]],
+        intermediate_nodes: Iterable[IntermediateNode[V]],
+        tx_epoch: int = 0,
     ):
         self.leaf_nodes = deque(leaf_nodes)
         self.intermediate_nodes = deque(intermediate_nodes)
@@ -24,39 +30,57 @@ class BHistoryTree(Generic[K, V]):
             self.intermediate_nodes.append(IntermediateNode(max_key=b"", children=[]))
 
         self.head = self.intermediate_nodes[0]
+        self.tx = tx_epoch
 
     # TODO: merge search functionality from put and get into a generic `search` function
     def put(self: "BHistoryTree[K, V]", key: K, value: V) -> None:
         key_bytes = key.serialize()
         node_stack: List[IntermediateNode[V]] = [self.head]
         while node_stack[-1].depth > 1:
-            new_node = node_stack[-1].search(key_bytes)
+            new_node = node_stack[-1].node_for_insert(key_bytes)
             if new_node is None:
                 raise RuntimeError("Unreachable code. This is a bug!!!")
             node_stack.append(new_node)
         assert isinstance(node_stack[-1], IntermediateNode)
         assert node_stack[-1].depth == 1
-        # TODO: check if the corresponding LeafNode already exists, and update it in-place if it does
+        # Check if the key already exists
+        maybe_leaf = node_stack[-1].search(key_bytes)
+        if maybe_leaf is not None:
+            maybe_leaf = cast(LeafNode[V], maybe_leaf)
+            assert isinstance(maybe_leaf, LeafNode)
+            # don't do anything with the WriteRequest for now
+            _ = maybe_leaf.add_record(offset=0, value=value.serialize(), tx=self.tx)
+            self.tx += 1 # increment the tx counter
+            return
         # New key, let's create a new BTreeLNode
         new_node = LeafNode(
             key=key_bytes,
             value=value.serialize(),
+            tx=self.tx,
             init_flags=LeafNodeFlags.PERSIST_HISTORY,
             history=[],
             history_idx=0,
             current_offset=0,
             history_offset=0,
         )
-        self.leaf_nodes.append(new_node)
-        # TODO: handle full nodes recursively
         try:
             node_stack[-1].insert(new_node)
+            node_stack.pop()
+            while len(node_stack) > 0:
+                n = node_stack.pop()
+                if n.max_key < new_node.key:
+                    n.max_key = new_node.key
+                else:
+                    break
         except NodeFullError:
             self.split_nodes(node_stack)
-            self.put(key, value)
+            return self.put(key, value)
+        self.tx += 1 # increment the tx counter
+        self.leaf_nodes.append(new_node)
 
     def split_nodes(self, node_stack: List[IntermediateNode[V]]) -> None:
         """Splits the nodes in the provided stack such that the bottom node is not full."""
+        assert len(node_stack) > 0
         if not node_stack[-1].full:
             return
         old_parent = node_stack.pop()
@@ -65,11 +89,14 @@ class BHistoryTree(Generic[K, V]):
         if len(node_stack) == 0:
             # We've reached the root, so we need to create a new root
             new_root = IntermediateNode(
-                max_key=new_node.max_key, children=[old_parent, new_node], depth=old_parent.depth + 1
+                max_key=new_node.max_key,
+                children=[old_parent, new_node],
+                depth=old_parent.depth + 1,
             )
             self.head = new_root
             self.intermediate_nodes.insert(0, new_root)
             return
+        node_stack[-1].insert(new_node)
         self.split_nodes(node_stack)
 
     def get(self: "BHistoryTree[K, V]", key: K) -> Optional[bytes]:
@@ -78,7 +105,7 @@ class BHistoryTree(Generic[K, V]):
         while node_stack[-1].depth > 1:
             new_node = node_stack[-1].search(key_bytes)
             if new_node is None:
-                raise RuntimeError("Unreachable code. This is a bug!!!")
+                return None
             assert isinstance(new_node, IntermediateNode)
             node_stack.append(new_node)
         assert isinstance(node_stack[-1], IntermediateNode)
