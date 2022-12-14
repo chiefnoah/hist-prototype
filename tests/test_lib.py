@@ -1,3 +1,4 @@
+import pytest
 from hist_prototype import Bytes, BHistoryTree
 from hist_prototype.intermediate_node import MAX_CHILDREN, IntermediateNode
 from unittest.mock import MagicMock
@@ -5,17 +6,18 @@ from typing import List, cast
 
 from hist_prototype.leaf_node import LeafNode
 
+@pytest.fixture
+def btree():
+    return BHistoryTree[Bytes, Bytes]([], [])
 
-def test_simple():
-    btree = BHistoryTree[Bytes, Bytes]([], [])
+def test_simple(btree):
     btree.put(Bytes(b"key1"), Bytes(b"value1"))
 
     result = btree.get(Bytes(b"key1"))
     assert result == b"value1"
 
 
-def test_many():
-    btree = BHistoryTree[Bytes, Bytes]([], [])
+def test_many(btree: BHistoryTree[Bytes, Bytes]]):
     COUNT = 100_000
     for i in range(COUNT):
         btree.put(Bytes(f"key{i}".encode()), Bytes(f"value{i}".encode()))
@@ -76,3 +78,4 @@ def test_delete_removes_record():
     btree.put(Bytes(b"key"), Bytes(b"value"))
     btree.delete(Bytes(b"key"))
     assert btree.get(Bytes(b"key")) is None
+
