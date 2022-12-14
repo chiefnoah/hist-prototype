@@ -64,9 +64,15 @@ def test_tree_split_new_root():
 def test_insert_saves_history():
     btree = BHistoryTree[Bytes, Bytes]([], [])
     for i in range(4):
-        btree.put(Bytes(f"key"), Bytes(f"value{i}".encode()))
+        btree.put(Bytes(b"key"), Bytes(f"value{i}".encode()))
 
     assert btree.leaf_nodes[0].value == b"value3"
     assert btree.leaf_nodes[0].history[0].value == b"value0"
     assert btree.leaf_nodes[0].history[1].value == b"value1"
     assert btree.leaf_nodes[0].history[2].value == b"value2"
+
+def test_delete_removes_record():
+    btree = BHistoryTree[Bytes, Bytes]([], [])
+    btree.put(Bytes(b"key"), Bytes(b"value"))
+    btree.delete(Bytes(b"key"))
+    assert btree.get(Bytes(b"key")) is None

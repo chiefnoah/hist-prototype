@@ -1,4 +1,4 @@
-from typing import Generic, List, Iterable
+from typing import Generic, List, Iterable, Optional
 from dataclasses import dataclass
 from threading import RLock
 from enum import IntFlag
@@ -47,8 +47,9 @@ class LeafNode(Generic[V]):
     flags: int
     # Weak reference to the key
     key: bytes
-    # Weak referenve to the value
-    value: bytes
+    # The value currently associated with the key.
+    # This could be none if the most recent update was a delete operation
+    value: Optional[bytes]
     # The tx instant for the most recent write
     tx: int  # u128 or u64, I haven't decided yet
     # The offset in file where the
@@ -67,7 +68,7 @@ class LeafNode(Generic[V]):
         # A weak reference to the stored key's bytes
         key: bytes,
         # A weak reference to the stored value's bytes
-        value: bytes,
+        value: Optional[bytes],
         # The tranasaction instant for the most recent write
         tx: int,
         # Flags are xored to DEFAULT_ARGS, meaning you must explicitly
@@ -96,13 +97,16 @@ class LeafNode(Generic[V]):
         self.delete = False
 
     def add_record(
-        self, offset: int, value: bytes, tx: int, delete: bool = False
+        self, offset: int, value: Optional[bytes], tx: int, delete: bool = False
     ) -> WriteRequest:
         with self.lock:
             self.history.append(
                 HistoryRecord(tx=self.tx, value=self.value, delete=delete)
             )
             self.tx = tx
+            if delete:
+                value = None
+            self.delete = delete
             self.value = value
             self.offset = offset
             return self.to_write_req(value)
@@ -112,3 +116,12 @@ class LeafNode(Generic[V]):
             return WriteRequest(
                 offset=self.offset, value=value, tx=self.tx, delete=self.delete
             )
+
+    def as_of(self: "LeafNode[V]", tx: int) -> Optional[bytes]:
+        with self.lock:
+            for record in self.history:
+                if record.tx <= tx:
+                    if record.delete:
+                        return None
+                    return record.value
+            return None

@@ -10,7 +10,7 @@ from typing import (
 
 from .leaf_node import LeafNode, LeafNodeFlags
 from .intermediate_node import IntermediateNode
-from .types import K, V, NodeFullError
+from .types import K, V, NodeFullError, Bytes
 
 
 class BHistoryTree(Generic[K, V]):
@@ -34,7 +34,7 @@ class BHistoryTree(Generic[K, V]):
         self.tx = tx_epoch
 
     # TODO: merge search functionality from put and get into a generic `search` function
-    def put(self: "BHistoryTree[K, V]", key: K, value: V) -> None:
+    def put(self: "BHistoryTree[K, V]", key: K, value: V, delete: bool = False) -> None:
         key_bytes = key.serialize()
         node_stack: List[IntermediateNode[V]] = [self.head]
         while node_stack[-1].depth > 1:
@@ -50,8 +50,13 @@ class BHistoryTree(Generic[K, V]):
             maybe_leaf = cast(LeafNode[V], maybe_leaf)
             assert isinstance(maybe_leaf, LeafNode)
             # don't do anything with the WriteRequest for now
-            _ = maybe_leaf.add_record(offset=0, value=value.serialize(), tx=self.tx)
+            _ = maybe_leaf.add_record(
+                offset=0, value=value.serialize(), tx=self.tx, delete=delete
+            )
             self.tx += 1  # increment the tx counter
+            return
+        if delete:
+            # If we're deleting a record that doesn't exist, just... don't do anything
             return
         # New key, let's create a new BTreeLNode
         new_node = LeafNode(
@@ -79,6 +84,17 @@ class BHistoryTree(Generic[K, V]):
         self.tx += 1  # increment the tx counter
         self.leaf_nodes.append(new_node)
 
+    def delete(self: "BHistoryTree[K, V]", key: K) -> None:
+        self.put(key, value=Bytes(b""), delete=True)
+
+    def as_of(self: "BHistoryTree[K, V]", search_key: K, tx: int) -> Optional[bytes]:
+        """Returns the value associated with search_key as of tx."""
+        leaf_node = self._get(search_key)
+        if leaf_node is not None:
+            return leaf_node.as_of(tx)
+        return None
+
+
     def split_nodes(self, node_stack: List[IntermediateNode[V]]) -> None:
         """Splits the nodes in the provided stack such that the bottom node is not full."""
         assert len(node_stack) > 0
@@ -100,7 +116,7 @@ class BHistoryTree(Generic[K, V]):
         node_stack[-1].insert(new_node)
         self.split_nodes(node_stack)
 
-    def get(self: "BHistoryTree[K, V]", key: K) -> Optional[bytes]:
+    def _get(self: "BHistoryTree[K, V]", key: K) -> Optional[LeafNode[V]]:
         key_bytes = key.serialize()
         node_stack: List[IntermediateNode[V]] = [self.head]
         while node_stack[-1].depth > 1:
@@ -111,7 +127,14 @@ class BHistoryTree(Generic[K, V]):
             node_stack.append(new_node)
         assert isinstance(node_stack[-1], IntermediateNode)
         assert node_stack[-1].depth == 1
-        leaf_node = node_stack[-1].search(key_bytes)
+        leaf_node = cast(LeafNode[V], node_stack[-1].search(key_bytes))
+        if leaf_node is not None:
+            return leaf_node
+        return None
+
+
+    def get(self: "BHistoryTree[K, V]", key: K) -> Optional[bytes]:
+        leaf_node = self._get(key)
         if leaf_node is not None:
             return leaf_node.value
         return None

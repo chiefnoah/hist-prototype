@@ -121,7 +121,7 @@ def node_for_insert(
 ) -> IntermediateNode[V]:
     """Searches a node's children for the correct node to insert into."""
     if len(node.children) == 0:
-        return None  # this should never happen
+        raise ValueError("Unreachable code. This is a bug!!!")
     # If the depth is greater than 1, the children will be `BTreeENode`s
     if node.depth > 1:
         for child in node.children:
