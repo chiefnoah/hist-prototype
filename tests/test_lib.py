@@ -17,7 +17,7 @@ def test_simple(btree):
     assert result == b"value1"
 
 
-def test_many(btree: BHistoryTree[Bytes, Bytes]]):
+def test_many(btree: BHistoryTree[Bytes, Bytes]):
     COUNT = 100_000
     for i in range(COUNT):
         btree.put(Bytes(f"key{i}".encode()), Bytes(f"value{i}".encode()))
@@ -79,3 +79,9 @@ def test_delete_removes_record():
     btree.delete(Bytes(b"key"))
     assert btree.get(Bytes(b"key")) is None
 
+def test_as_of_query(btree):
+    btree.put(Bytes(b"key"), Bytes(b"value1"))
+    btree.put(Bytes(b"key"), Bytes(b"value1"))
+    btree.put(Bytes(b"key"), Bytes(b"value1"))
+    btree.put(Bytes(b"key"), Bytes(b"value1"))
+    assert btree.tx == 4
