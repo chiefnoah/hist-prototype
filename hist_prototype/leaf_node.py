@@ -1,9 +1,9 @@
-from typing import Generic, List, Iterable, Optional
+from typing import Generic, List, Iterable, Optional, Union
 from dataclasses import dataclass
 from threading import RLock
 from enum import IntFlag
 
-from .types import V, TX
+from .types import V, TX, Splittable
 
 # The maximum number of children BTreeLNode's are allowed to have
 MAX_CHILDREN = 16
@@ -25,17 +25,22 @@ class HistoryRecord:
         output[0:16] = self.tx.to_bytes(16, "little")
         output[16 : len(self.value)] = self.value
         return output
+@dataclass(frozen=True)
+class ReadRequest:
+    """A request to read a serialized HistoryRecord from disk."""
+    offset: int
+    tx: int
 
 
 @dataclass(frozen=True)
 class WriteRequest:
+    """A request to write a serialized LeafNode to disk."""
     offset: int
     delete: bool
     value: bytes
     tx: int  # u128
 
-
-class LeafNode(Generic[V]):
+class LeafNode(Splittable, Generic[V]):
 
     DEFAULT_FLAGS: int = 0  # no defaults
 
@@ -117,11 +122,34 @@ class LeafNode(Generic[V]):
                 offset=self.offset, value=value, tx=self.tx, delete=self.delete
             )
 
-    def as_of(self: "LeafNode[V]", tx: int) -> Optional[bytes]:
+    def as_of(self: "LeafNode[V]", tx: int) -> Union[bytes, ReadRequest, None]:
+        # If we have history that is older than the small buffer
+        # and the requested tx is older than our buffer's history,
+        # we need to search the history index for this tx's value
+        if tx < self.history[-1].tx and self.history_offset > 0:
+            return ReadRequest(self.history_offset, tx)
         with self.lock:
-            for record in self.history:
-                if record.tx <= tx:
-                    if record.delete:
-                        return None
-                    return record.value
-            return None
+            if tx > self.tx and not self.delete:
+                return self.value
+            elif tx > self.tx and self.delete:
+                return None
+            index = 0
+            for i, record in enumerate(self.history):
+                if record.tx > tx:
+                    index = i - 1
+                    break
+            else:
+                # This executes if the above break didn't happen
+                if len(self.history) == 0:
+                    return None
+                
+            # This means we have no history and the as_of is asking for before this value
+            # was ever set
+            if self.history[index].tx > tx:
+                return None
+            history_node: HistoryRecord = self.history[index]
+            return history_node.value
+
+    def split(self) -> "LeafNode[V]":
+        # TODO: move split logic out of function into member method for locking sanity
+        raise NotImplementedError("Leaf nodes cannot be split")

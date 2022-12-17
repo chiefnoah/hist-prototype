@@ -79,9 +79,16 @@ def test_delete_removes_record():
     btree.delete(Bytes(b"key"))
     assert btree.get(Bytes(b"key")) is None
 
-def test_as_of_query(btree):
+def test_as_of_query(btree: BHistoryTree[Bytes, Bytes]):
     btree.put(Bytes(b"key"), Bytes(b"value1"))
-    btree.put(Bytes(b"key"), Bytes(b"value1"))
-    btree.put(Bytes(b"key"), Bytes(b"value1"))
-    btree.put(Bytes(b"key"), Bytes(b"value1"))
+    btree.put(Bytes(b"key"), Bytes(b"value2"))
+    btree.delete(Bytes(b"key"))
+    btree.put(Bytes(b"key"), Bytes(b"value4"))
     assert btree.tx == 4
+    # Check we can get a value that was correct as of the requested tx
+    assert btree.as_of(Bytes(b"key"), 1) == b"value2"
+    # If we request a tx that is older than the oldest insert, we get None
+    assert btree.as_of(Bytes(b"key"), -1) is None
+    # If we request a tx more recent than the most recent value, we get the current value
+    assert btree.as_of(Bytes(b"key"), 5) == b"value4"
+    
