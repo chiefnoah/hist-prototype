@@ -26,11 +26,14 @@ class HistoryRecord:
             value_size = len(self.value)
         output = bytearray()
         output[0:16] = self.tx.to_bytes(16, "little")
-        output[16 : value_size] = self.value or b""
+        output[16:value_size] = self.value or b""
         return output
+
+
 @dataclass(frozen=True)
 class ReadRequest:
     """A request to read a serialized HistoryRecord from disk."""
+
     offset: int
     tx: int
 
@@ -38,10 +41,12 @@ class ReadRequest:
 @dataclass(frozen=True)
 class WriteRequest:
     """A request to write a serialized LeafNode to disk."""
+
     offset: int
     delete: bool
     value: bytes
     tx: int  # u128
+
 
 class LeafNode(Splittable, Generic[V]):
 
@@ -145,7 +150,7 @@ class LeafNode(Splittable, Generic[V]):
                 # This executes if the above break didn't happen
                 if len(self.history) == 0:
                     return None
-                
+
             # This means we have no history and the as_of is asking for before this value
             # was ever set
             if self.history[index].tx > tx:

@@ -34,7 +34,9 @@ class BHistoryTree(Generic[K, V]):
         self.tx = tx_epoch
 
     # TODO: merge search functionality from put and get into a generic `search` function
-    def put(self: "BHistoryTree[K, V]", key: K, value: Optional[V], delete: bool = False) -> None:
+    def put(
+        self: "BHistoryTree[K, V]", key: K, value: Optional[V], delete: bool = False
+    ) -> None:
         value_bytes = None
         if value is not None:
             value_bytes = value.serialize()
@@ -100,7 +102,6 @@ class BHistoryTree(Generic[K, V]):
             return result
         return None
 
-
     def split_nodes(self, node_stack: List[IntermediateNode[V]]) -> None:
         """Splits the nodes in the provided stack such that the bottom node is not full."""
         assert len(node_stack) > 0
@@ -137,7 +138,6 @@ class BHistoryTree(Generic[K, V]):
         if leaf_node is not None:
             return leaf_node
         return None
-
 
     def get(self: "BHistoryTree[K, V]", key: K) -> Optional[bytes]:
         leaf_node = self._get(key)

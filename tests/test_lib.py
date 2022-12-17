@@ -6,11 +6,13 @@ from typing import List, cast
 
 from hist_prototype.leaf_node import LeafNode
 
+
 @pytest.fixture
 def btree():
     return BHistoryTree[Bytes, Bytes]([], [])
 
-def test_simple(btree):
+
+def test_simple(btree: BHistoryTree[Bytes, Bytes]):
     btree.put(Bytes(b"key1"), Bytes(b"value1"))
 
     result = btree.get(Bytes(b"key1"))
@@ -32,7 +34,7 @@ def test_split_nodes():
     root = IntermediateNode[Bytes](max_key=b"", children=[], depth=2)
     counter = 1
     for i in range(1, MAX_CHILDREN + 1):
-        inode = IntermediateNode(
+        inode = IntermediateNode[Bytes](
             max_key=f"key{i * MAX_CHILDREN}".encode(), children=[], depth=1
         )
         for _ in range(1, MAX_CHILDREN + 1):
@@ -73,11 +75,13 @@ def test_insert_saves_history():
     assert btree.leaf_nodes[0].history[1].value == b"value1"
     assert btree.leaf_nodes[0].history[2].value == b"value2"
 
+
 def test_delete_removes_record():
     btree = BHistoryTree[Bytes, Bytes]([], [])
     btree.put(Bytes(b"key"), Bytes(b"value"))
     btree.delete(Bytes(b"key"))
     assert btree.get(Bytes(b"key")) is None
+
 
 def test_as_of_query(btree: BHistoryTree[Bytes, Bytes]):
     btree.put(Bytes(b"key"), Bytes(b"value1"))
@@ -91,4 +95,3 @@ def test_as_of_query(btree: BHistoryTree[Bytes, Bytes]):
     assert btree.as_of(Bytes(b"key"), -1) is None
     # If we request a tx more recent than the most recent value, we get the current value
     assert btree.as_of(Bytes(b"key"), 5) == b"value4"
-    

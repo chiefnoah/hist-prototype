@@ -11,6 +11,7 @@ class Splittable(Protocol):
     def split(self) -> "Splittable":
         ...
 
+
 K = TypeVar("K", bound=Serializable)
 V = TypeVar("V", bound=Serializable)
 
