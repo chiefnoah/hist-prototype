@@ -8,9 +8,9 @@ from typing import (
     cast,
 )
 
-from .leaf_node import LeafNode, LeafNodeFlags
+from .leaf_node import LeafNode, LeafNodeFlags, ReadRequest
 from .intermediate_node import IntermediateNode
-from .types import K, V, NodeFullError, Bytes
+from .types import K, V, NodeFullError
 
 
 class BHistoryTree(Generic[K, V]):
@@ -34,7 +34,10 @@ class BHistoryTree(Generic[K, V]):
         self.tx = tx_epoch
 
     # TODO: merge search functionality from put and get into a generic `search` function
-    def put(self: "BHistoryTree[K, V]", key: K, value: V, delete: bool = False) -> None:
+    def put(self: "BHistoryTree[K, V]", key: K, value: Optional[V], delete: bool = False) -> None:
+        value_bytes = None
+        if value is not None:
+            value_bytes = value.serialize()
         key_bytes = key.serialize()
         node_stack: List[IntermediateNode[V]] = [self.head]
         while node_stack[-1].depth > 1:
@@ -51,7 +54,7 @@ class BHistoryTree(Generic[K, V]):
             assert isinstance(maybe_leaf, LeafNode)
             # don't do anything with the WriteRequest for now
             _ = maybe_leaf.add_record(
-                offset=0, value=value.serialize(), tx=self.tx, delete=delete
+                offset=0, value=value_bytes, tx=self.tx, delete=delete
             )
             self.tx += 1  # increment the tx counter
             return
@@ -59,9 +62,9 @@ class BHistoryTree(Generic[K, V]):
             # If we're deleting a record that doesn't exist, just... don't do anything
             return
         # New key, let's create a new BTreeLNode
-        new_node = LeafNode(
+        new_leaf = LeafNode[V](
             key=key_bytes,
-            value=value.serialize(),
+            value=value_bytes,
             tx=self.tx,
             init_flags=LeafNodeFlags.PERSIST_HISTORY,
             history=[],
@@ -70,28 +73,31 @@ class BHistoryTree(Generic[K, V]):
             history_offset=0,
         )
         try:
-            node_stack[-1].insert(new_node)
+            node_stack[-1].insert(new_leaf)
             node_stack.pop()
             while len(node_stack) > 0:
                 n = node_stack.pop()
-                if n.max_key < new_node.key:
-                    n.max_key = new_node.key
+                if n.max_key < new_leaf.key:
+                    n.max_key = new_leaf.key
                 else:
                     break
         except NodeFullError:
             self.split_nodes(node_stack)
             return self.put(key, value)
         self.tx += 1  # increment the tx counter
-        self.leaf_nodes.append(new_node)
+        self.leaf_nodes.append(new_leaf)
 
     def delete(self: "BHistoryTree[K, V]", key: K) -> None:
-        self.put(key, value=Bytes(b""), delete=True)
+        self.put(key, value=None, delete=True)
 
     def as_of(self: "BHistoryTree[K, V]", search_key: K, tx: int) -> Optional[bytes]:
         """Returns the value associated with search_key as of tx."""
         leaf_node = self._get(search_key)
         if leaf_node is not None:
-            return leaf_node.as_of(tx)
+            result = leaf_node.as_of(tx)
+            if isinstance(result, ReadRequest):
+                raise NotImplementedError("TODO: implement read requests")
+            return result
         return None
 
 

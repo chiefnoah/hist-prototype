@@ -10,20 +10,23 @@ MAX_CHILDREN = 16
 
 
 class LeafNodeFlags(IntFlag):
-    DELETED: int = 1  # type: ignore
-    PERSIST_HISTORY: int = 1 << 1  # type: ignore
+    DELETED: int = 1
+    PERSIST_HISTORY: int = 1 << 1
 
 
 @dataclass
 class HistoryRecord:
     tx: TX
-    value: bytes
+    value: Optional[bytes]
     delete: bool
 
     def serialize(self) -> bytes:
+        value_size = 0
+        if self.value is not None:
+            value_size = len(self.value)
         output = bytearray()
         output[0:16] = self.tx.to_bytes(16, "little")
-        output[16 : len(self.value)] = self.value
+        output[16 : value_size] = self.value or b""
         return output
 @dataclass(frozen=True)
 class ReadRequest:
@@ -116,10 +119,10 @@ class LeafNode(Splittable, Generic[V]):
             self.offset = offset
             return self.to_write_req(value)
 
-    def to_write_req(self, value: bytes) -> WriteRequest:
+    def to_write_req(self, value: Optional[bytes]) -> WriteRequest:
         with self.lock:
             return WriteRequest(
-                offset=self.offset, value=value, tx=self.tx, delete=self.delete
+                offset=self.offset, value=value or b"", tx=self.tx, delete=self.delete
             )
 
     def as_of(self: "LeafNode[V]", tx: int) -> Union[bytes, ReadRequest, None]:

@@ -110,9 +110,9 @@ def split_intermediate_node(node: IntermediateNode[V]) -> IntermediateNode[V]:
     )
     node.children = node.children[0:mid_point]
     if node.depth > 1:
-        node.max_key = node.children[-1].max_key
+        node.max_key = cast(IntermediateNode[V], node.children[-1]).max_key
     else:
-        node.max_key = node.children[-1].key
+        node.max_key = cast(LeafNode[V], node.children[-1]).key
     return new_node
 
 
@@ -130,7 +130,6 @@ def node_for_insert(
                 return child
         # If we get to this point, it means the new node to be inserted is probably the new max
         # Return the last child
-        return node.children[-1]
+        return cast(IntermediateNode[V], node.children[-1])
     else:
         return node
-    return None
