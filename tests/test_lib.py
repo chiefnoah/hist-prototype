@@ -1,5 +1,5 @@
 import pytest
-from hist_prototype import Bytes, BHistoryTree
+from hist_prototype import Bytes, BufferedBTree
 from hist_prototype.intermediate_node import MAX_CHILDREN, IntermediateNode
 from unittest.mock import MagicMock
 from typing import List, cast
@@ -9,17 +9,17 @@ from hist_prototype.leaf_node import LeafNode
 
 @pytest.fixture
 def btree():
-    return BHistoryTree[Bytes, Bytes]([], [])
+    return BufferedBTree[Bytes, Bytes]([], [])
 
 
-def test_simple(btree: BHistoryTree[Bytes, Bytes]):
+def test_simple(btree: BufferedBTree[Bytes, Bytes]):
     btree.put(Bytes(b"key1"), Bytes(b"value1"))
 
     result = btree.get(Bytes(b"key1"))
     assert result == b"value1"
 
 
-def test_many(btree: BHistoryTree[Bytes, Bytes]):
+def test_many(btree: BufferedBTree[Bytes, Bytes]):
     COUNT = 100_000
     for i in range(COUNT):
         btree.put(Bytes(f"key{i}".encode()), Bytes(f"value{i}".encode()))
@@ -56,7 +56,7 @@ def test_tree_split_new_root():
         depth=1,
     )
     # Create a tree with a root that is full
-    tree = BHistoryTree[Bytes, Bytes](
+    tree = BufferedBTree[Bytes, Bytes](
         cast(List[LeafNode[Bytes]], root.children), [root]
     )
     tree.put(Bytes(b"abc"), Bytes(b"val"))
@@ -66,7 +66,7 @@ def test_tree_split_new_root():
 
 
 def test_insert_saves_history():
-    btree = BHistoryTree[Bytes, Bytes]([], [])
+    btree = BufferedBTree[Bytes, Bytes]([], [])
     for i in range(4):
         btree.put(Bytes(b"key"), Bytes(f"value{i}".encode()))
 
@@ -77,13 +77,13 @@ def test_insert_saves_history():
 
 
 def test_delete_removes_record():
-    btree = BHistoryTree[Bytes, Bytes]([], [])
+    btree = BufferedBTree[Bytes, Bytes]([], [])
     btree.put(Bytes(b"key"), Bytes(b"value"))
     btree.delete(Bytes(b"key"))
     assert btree.get(Bytes(b"key")) is None
 
 
-def test_as_of_query(btree: BHistoryTree[Bytes, Bytes]):
+def test_as_of_in_memory_query(btree: BufferedBTree[Bytes, Bytes]):
     btree.put(Bytes(b"key"), Bytes(b"value1"))
     btree.put(Bytes(b"key"), Bytes(b"value2"))
     btree.delete(Bytes(b"key"))

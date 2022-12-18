@@ -13,7 +13,7 @@ from .intermediate_node import IntermediateNode
 from .types import K, V, NodeFullError
 
 
-class BHistoryTree(Generic[K, V]):
+class BufferedBTree(Generic[K, V]):
     leaf_nodes: Deque[LeafNode[V]]
     intermediate_nodes: Deque[IntermediateNode[V]]
     head: IntermediateNode[V]
@@ -35,7 +35,7 @@ class BHistoryTree(Generic[K, V]):
 
     # TODO: merge search functionality from put and get into a generic `search` function
     def put(
-        self: "BHistoryTree[K, V]", key: K, value: Optional[V], delete: bool = False
+        self: "BufferedBTree[K, V]", key: K, value: Optional[V], delete: bool = False
     ) -> None:
         value_bytes = None
         if value is not None:
@@ -89,10 +89,10 @@ class BHistoryTree(Generic[K, V]):
         self.tx += 1  # increment the tx counter
         self.leaf_nodes.append(new_leaf)
 
-    def delete(self: "BHistoryTree[K, V]", key: K) -> None:
+    def delete(self: "BufferedBTree[K, V]", key: K) -> None:
         self.put(key, value=None, delete=True)
 
-    def as_of(self: "BHistoryTree[K, V]", search_key: K, tx: int) -> Optional[bytes]:
+    def as_of(self: "BufferedBTree[K, V]", search_key: K, tx: int) -> Optional[bytes]:
         """Returns the value associated with search_key as of tx."""
         leaf_node = self._get(search_key)
         if leaf_node is not None:
@@ -123,7 +123,7 @@ class BHistoryTree(Generic[K, V]):
         node_stack[-1].insert(new_node)
         self.split_nodes(node_stack)
 
-    def _get(self: "BHistoryTree[K, V]", key: K) -> Optional[LeafNode[V]]:
+    def _get(self: "BufferedBTree[K, V]", key: K) -> Optional[LeafNode[V]]:
         key_bytes = key.serialize()
         node_stack: List[IntermediateNode[V]] = [self.head]
         while node_stack[-1].depth > 1:
@@ -139,7 +139,7 @@ class BHistoryTree(Generic[K, V]):
             return leaf_node
         return None
 
-    def get(self: "BHistoryTree[K, V]", key: K) -> Optional[bytes]:
+    def get(self: "BufferedBTree[K, V]", key: K) -> Optional[bytes]:
         leaf_node = self._get(key)
         if leaf_node is not None:
             return leaf_node.value
