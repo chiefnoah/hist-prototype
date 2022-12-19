@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from threading import RLock
 from typing import List, Union, Optional, Generic, cast
 
 from .leaf_node import LeafNode, MAX_CHILDREN
@@ -13,6 +14,7 @@ class IntermediateNode(Generic[V]):
     max_key: bytes
     children: List[BTreeNode[V]]
     depth: int = 1
+    lock: RLock = field(default_factory=RLock)
 
     def search(
         self: "IntermediateNode[V]", search_key: bytes
