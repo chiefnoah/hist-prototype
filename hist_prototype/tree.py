@@ -1,4 +1,5 @@
 from collections import deque
+from pathlib import Path
 from typing import (
     Deque,
     Iterable,
@@ -6,7 +7,10 @@ from typing import (
     Optional,
     Generic,
     cast,
+    Union,
 )
+
+from hist_prototype.storage import IOHandler
 
 from .leaf_node import LeafNode, LeafNodeFlags, ReadRequest
 from .intermediate_node import IntermediateNode
@@ -18,12 +22,14 @@ class BufferedBTree(Generic[K, V]):
     intermediate_nodes: Deque[IntermediateNode[V]]
     head: IntermediateNode[V]
     current_tx: int
+    io: IOHandler
 
     def __init__(
         self,
         leaf_nodes: Iterable[LeafNode[V]],
         intermediate_nodes: Iterable[IntermediateNode[V]],
         tx_epoch: int = 0,
+        path: Union[str, Path] = Path("./index.bin"),
     ):
         self.leaf_nodes = deque(leaf_nodes)
         self.intermediate_nodes = deque(intermediate_nodes)
@@ -32,6 +38,7 @@ class BufferedBTree(Generic[K, V]):
 
         self.head = self.intermediate_nodes[0]
         self.tx = tx_epoch
+        self.io = IOHandler(file=open(path, "w+b"))
 
     # TODO: merge search functionality from put and get into a generic `search` function
     def put(

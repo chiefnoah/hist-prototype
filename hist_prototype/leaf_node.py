@@ -35,14 +35,14 @@ class ReadRequest:
     """A request to read a serialized HistoryRecord from disk."""
 
     offset: int
-    tx: int
+    tx: Optional[int]
 
 
 @dataclass(frozen=True)
 class WriteRequest:
     """A request to write a serialized LeafNode to disk."""
 
-    offset: int
+    offset: Optional[int]
     delete: bool
     value: bytes
     tx: int  # u128
