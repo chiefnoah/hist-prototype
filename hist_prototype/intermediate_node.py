@@ -2,8 +2,9 @@ from dataclasses import dataclass, field
 from threading import RLock
 from typing import List, Union, Optional, Generic, cast
 
-from .leaf_node import LeafNode, MAX_CHILDREN
+from .leaf_node import LeafNode
 from .types import V, NodeFullError
+from .constants import MAX_CHILDREN
 
 BTreeNode = Union["IntermediateNode[V]", LeafNode[V]]
 

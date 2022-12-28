@@ -22,12 +22,13 @@ class BufferedBTree(Generic[K, V]):
     intermediate_nodes: Deque[IntermediateNode[V]]
     head: IntermediateNode[V]
     current_tx: int
-    io: IOHandler
+    #io: IOHandler
 
     def __init__(
         self,
         leaf_nodes: Iterable[LeafNode[V]],
         intermediate_nodes: Iterable[IntermediateNode[V]],
+        #iohandler: IOHandler,
         tx_epoch: int = 0,
         path: Union[str, Path] = Path("./index.bin"),
     ):
@@ -38,7 +39,7 @@ class BufferedBTree(Generic[K, V]):
 
         self.head = self.intermediate_nodes[0]
         self.tx = tx_epoch
-        self.io = IOHandler(file=open(path, "w+b"))
+        #self.io = iohandler
 
     # TODO: merge search functionality from put and get into a generic `search` function
     def put(

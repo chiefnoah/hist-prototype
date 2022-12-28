@@ -4,10 +4,7 @@ from threading import RLock
 from enum import IntFlag
 
 from .types import V, TX, Splittable
-
-# The maximum number of children BTreeLNode's are allowed to have
-MAX_CHILDREN = 16
-
+from .constants import MAX_CHILDREN
 
 class LeafNodeFlags(IntFlag):
     DELETED: int = 1

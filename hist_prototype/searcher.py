@@ -1,10 +1,12 @@
 
-from pathlib import Path
-from typing import Union
 from .storage import IOHandler
+from typing import Optional
 
 class HistorySearcher:
-    iohandler: IOHandler
+    io: IOHandler
 
-    def __init__(self, path: Union[str, Path]) -> None:
-        self.iohandler = IOHandler(open(path, "r+b"))
+    def __init__(self, iohandler: IOHandler) -> None:
+        self.io = iohandler
+
+    def search(self: "HistorySearcher", offset: int, search_key: bytes) -> Optional[int]:
+        """Searches the history index for the given key and returns the corresponding data offset."""
