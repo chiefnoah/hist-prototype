@@ -82,9 +82,9 @@ class LeafNode(Splittable, Generic[V]):
         key: bytes,
         # A weak reference to the stored value's bytes
         value: Optional[bytes],
-        # The tranasaction instant for the most recent write
+        # The transaction instant for the most recent write
         tx: int,
-        # Flags are xored to DEFAULT_ARGS, meaning you must explicitly
+        # Flags are XORed to DEFAULT_ARGS, meaning you must explicitly
         # disable default flags by setting them as flags. Yes, this may be
         # slightly confusing behavior
         init_flags: int,

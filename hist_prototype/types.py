@@ -8,6 +8,7 @@ class Serializable(Protocol):
 
 
 class Splittable(Protocol):
+    """A type that can split itself into 2."""
     def split(self) -> "Splittable":
         ...
 
