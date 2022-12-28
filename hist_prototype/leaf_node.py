@@ -1,4 +1,4 @@
-from typing import Generic, List, Iterable, Optional, Union, Literal
+from typing import Generic, List, Iterable, Optional, Union
 from dataclasses import dataclass
 from threading import RLock
 from enum import IntFlag

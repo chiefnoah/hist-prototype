@@ -7,4 +7,4 @@ class HistorySearcher:
     iohandler: IOHandler
 
     def __init__(self, path: Union[str, Path]) -> None:
-        self.iohandler = IOHandler(path)
+        self.iohandler = IOHandler(open(path, "r+b"))
