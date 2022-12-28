@@ -1,5 +1,5 @@
 from threading import RLock
-from hist_prototype.leaf_node import ReadRequest, WriteRequest
+from hist_prototype.leaf_node import HistoryReadRequest, WriteRequest
 from typing import BinaryIO
 
 class InvalidWriteRequest(ValueError):
@@ -7,19 +7,13 @@ class InvalidWriteRequest(ValueError):
 
 class IOHandler:
     file: BinaryIO
-    page_size: int
     lock: RLock
 
-    def __init__(self: "IOHandler", file: BinaryIO, page_size: int = 256) -> None:
+    def __init__(self: "IOHandler", file: BinaryIO) -> None:
         self.file = file
-        self.page_size = page_size
         self.lock = RLock()
 
     def write(self: "IOHandler", request: WriteRequest) -> int:
-        if len(request.value) != self.page_size:
-            raise InvalidWriteRequest(
-                f"Value must be of length {self.page_size}, got {len(request.value)}"
-            )
         with self.lock:
             offset = request.offset
             if offset is None:
@@ -31,11 +25,12 @@ class IOHandler:
             self.file.write(request.value)
         return offset
 
-    def read(self: "IOHandler", request: ReadRequest) -> bytes:
-        buf = bytearray(self.page_size)
+    def read(self: "IOHandler", offset: int, size: int) -> bytes:
+        buf = bytearray(size)
         with self.lock:
-            self.file.seek(request.offset)
+            self.file.seek(offset)
             # file has a readinto, so why is type checking complaining?
             count = self.file.readinto(buf)  # type: ignore
-            assert count == self.page_size
-        return buf
+            # TODO: raise a better error here
+            assert count == size
+        return bytes(buf)

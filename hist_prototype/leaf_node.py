@@ -3,8 +3,7 @@ from dataclasses import dataclass
 from threading import RLock
 from enum import IntFlag
 
-from .types import V, TX, Splittable
-from .constants import MAX_CHILDREN
+from .types import V, TX, Splittable, WriteRequest, HistoryReadRequest
 
 class LeafNodeFlags(IntFlag):
     DELETED: int = 1
@@ -26,23 +25,6 @@ class HistoryRecord:
         output[16:value_size] = self.value or b""
         return output
 
-
-@dataclass(frozen=True)
-class ReadRequest:
-    """A request to read a serialized HistoryRecord from disk."""
-
-    offset: int
-    tx: Optional[int]
-
-
-@dataclass(frozen=True)
-class WriteRequest:
-    """A request to write a serialized LeafNode to disk."""
-
-    offset: Optional[int]
-    delete: bool
-    value: bytes
-    tx: int  # u128
 
 
 class LeafNode(Splittable, Generic[V]):
@@ -127,12 +109,12 @@ class LeafNode(Splittable, Generic[V]):
                 offset=self.offset, value=value or b"", tx=self.tx, delete=self.delete
             )
 
-    def as_of(self: "LeafNode[V]", tx: int) -> Union[bytes, ReadRequest, None]:
+    def as_of(self: "LeafNode[V]", tx: int) -> Union[bytes, HistoryReadRequest, None]:
         # If we have history that is older than the small buffer
         # and the requested tx is older than our buffer's history,
         # we need to search the history index for this tx's value
         if tx < self.history[-1].tx and self.history_offset > 0:
-            return ReadRequest(self.history_offset, tx)
+            return HistoryReadRequest(self.history_offset, tx)
         with self.lock:
             if tx > self.tx and not self.delete:
                 return self.value
@@ -147,6 +129,7 @@ class LeafNode(Splittable, Generic[V]):
                 # This executes if the above break didn't happen
                 if len(self.history) == 0:
                     return None
+                return HistoryReadRequest(self.history_offset, tx)
 
             # This means we have no history and the as_of is asking for before this value
             # was ever set

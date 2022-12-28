@@ -10,9 +10,8 @@ from typing import (
     Union,
 )
 
-from hist_prototype.storage import IOHandler
 
-from .leaf_node import LeafNode, LeafNodeFlags, ReadRequest
+from .leaf_node import LeafNode, LeafNodeFlags, HistoryReadRequest
 from .intermediate_node import IntermediateNode
 from .types import K, V, NodeFullError
 
@@ -105,7 +104,7 @@ class BufferedBTree(Generic[K, V]):
         leaf_node = self._get(search_key)
         if leaf_node is not None:
             result = leaf_node.as_of(tx)
-            if isinstance(result, ReadRequest):
+            if isinstance(result, HistoryReadRequest):
                 raise NotImplementedError("TODO: implement read requests")
             return result
         return None
