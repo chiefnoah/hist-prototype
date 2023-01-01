@@ -88,12 +88,12 @@ class HistoryIndexNode(Serializable):
         return self.children[-1][0]
 
     def serialize(self) -> bytes:
-        #                  |TX  |Ofset              | depth (u16)
+        #                  |TX  |Offset              | depth (u16)
         buf = bytearray(((16 + 8) * MAX_CHILDREN) + 2)
         buf[0:2] = self.depth.to_bytes(2, "little")
         for i, child in enumerate(self.children):
-            offset = (i * CHILD_SIZE) + 2
-            buf[offset : offset + CHILD_SIZE] = child[0].to_bytes(16, "little") + child[
+            o = (i * CHILD_SIZE) + 2
+            buf[o : o + CHILD_SIZE] = child[0].to_bytes(16, "little") + child[
                 1
             ].to_bytes(8, "little")
         return bytes(buf)
@@ -103,10 +103,10 @@ class HistoryIndexNode(Serializable):
         depth = int.from_bytes(buf[0:2], "little")
         children: List[DataPair] = []
         for i in range(MAX_CHILDREN):
-            offset = (i * CHILD_SIZE) + 2
-            tx: TX = int.from_bytes(buf[offset : offset + 16], "little")
-            offset: Offset = int.from_bytes(
-                buf[offset + 16 : offset + CHILD_SIZE], "little"
+            o: Offset = (i * CHILD_SIZE) + 2
+            tx: TX = int.from_bytes(buf[o : o + 16], "little")
+            o = int.from_bytes(
+                buf[o + 16 : o + CHILD_SIZE], "little"
             )
-            children.append((tx, offset))
+            children.append((tx, o))
         return HistoryIndexNode(depth, children)

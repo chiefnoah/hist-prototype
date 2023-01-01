@@ -7,13 +7,13 @@ from typing import (
     Optional,
     Generic,
     cast,
-    Union,
 )
 
 
-from .leaf_node import LeafNode, LeafNodeFlags, HistoryReadRequest
+from .leaf_node import LeafNode, LeafNodeFlags
 from .intermediate_node import IntermediateNode
-from .types import K, V, NodeFullError
+from .types import K, V, NodeFullError, HistoryReadRequest
+from .storage import IOHandler
 
 
 class BufferedBTree(Generic[K, V]):
@@ -21,15 +21,16 @@ class BufferedBTree(Generic[K, V]):
     intermediate_nodes: Deque[IntermediateNode[V]]
     head: IntermediateNode[V]
     current_tx: int
-    #io: IOHandler
+    history_index: IOHandler
+    data_log: IOHandler
 
     def __init__(
         self,
         leaf_nodes: Iterable[LeafNode[V]],
         intermediate_nodes: Iterable[IntermediateNode[V]],
-        #iohandler: IOHandler,
+        history_index: IOHandler,
+        data_log: IOHandler,
         tx_epoch: int = 0,
-        path: Union[str, Path] = Path("./index.bin"),
     ):
         self.leaf_nodes = deque(leaf_nodes)
         self.intermediate_nodes = deque(intermediate_nodes)
@@ -38,7 +39,8 @@ class BufferedBTree(Generic[K, V]):
 
         self.head = self.intermediate_nodes[0]
         self.tx = tx_epoch
-        #self.io = iohandler
+        self.history_index = history_index
+        self.data_log = data_log
 
     # TODO: merge search functionality from put and get into a generic `search` function
     def put(

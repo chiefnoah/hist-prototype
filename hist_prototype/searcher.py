@@ -30,3 +30,4 @@ class HistorySearcher:
         for i, child in enumerate(node.children):
             if child[0] > request.tx:
                 return node.children[i-1][1]
+        return None

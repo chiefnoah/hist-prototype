@@ -1,6 +1,6 @@
 from threading import RLock
-from hist_prototype.leaf_node import HistoryReadRequest, WriteRequest
 from typing import BinaryIO
+from .types import WriteRequest
 
 class InvalidWriteRequest(ValueError):
     ...
