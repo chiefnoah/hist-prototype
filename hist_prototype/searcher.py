@@ -1,7 +1,7 @@
 
 from .storage import IOHandler
 from .types import HistoryReadRequest, HistoryIndexNode
-from typing import Optional
+from typing import Optional, cast
 
 class HistorySearcher:
     io: IOHandler
@@ -21,7 +21,7 @@ class HistorySearcher:
             for child in node.children:
                 if child[0] > request.tx:
                     offset = child[1]
-                    buf = self.io.read(offset, request.SIZE)
+                    buf = self.io.read(cast(int, offset), request.SIZE)
                     node = HistoryIndexNode.deserialize(buf)
                     break
         if node.depth > 0:
@@ -29,5 +29,8 @@ class HistorySearcher:
         # Search this "leaf" node for the last offset value that is before the requested tx
         for i, child in enumerate(node.children):
             if child[0] > request.tx:
-                return node.children[i-1][1]
+                # Cast is because we type alias the value half of the tuple pair
+                # It's always either an int or None
+                return cast(int | None, node.children[i-1][1])
+                
         return None

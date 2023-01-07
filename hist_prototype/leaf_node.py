@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from threading import RLock
 from enum import IntFlag
 
+from .constants import MAX_VALUE_SIZE
+
 from .types import V, TX, Splittable, WriteRequest, HistoryReadRequest
 
 class LeafNodeFlags(IntFlag):
@@ -13,17 +15,25 @@ class LeafNodeFlags(IntFlag):
 @dataclass
 class HistoryRecord:
     tx: TX
-    value: Optional[bytes]
+    value: bytes
     delete: bool
+
+    SIZE: int = 16 + 1 + MAX_VALUE_SIZE
 
     def serialize(self) -> bytes:
         value_size = 0
         if self.value is not None:
             value_size = len(self.value)
-        output = bytearray()
+        output = bytearray(MAX_VALUE_SIZE)
         output[0:16] = self.tx.to_bytes(16, "little")
         output[16:value_size] = self.value or b""
         return output
+
+    @classmethod
+    def deserialize(cls, data: bytes) -> "HistoryRecord":
+        tx = int.from_bytes(data[0:16], "little")
+        value = data[16:]
+        return cls(tx=tx, value=value, delete=False)
 
 
 
@@ -92,8 +102,10 @@ class LeafNode(Splittable, Generic[V]):
         self, offset: int, value: Optional[bytes], tx: int, delete: bool = False
     ) -> WriteRequest:
         with self.lock:
+            if value is not None:
+                assert len(value) < MAX_VALUE_SIZE
             self.history.append(
-                HistoryRecord(tx=self.tx, value=self.value, delete=delete)
+                HistoryRecord(tx=self.tx, value=value or b'', delete=delete)
             )
             self.tx = tx
             if delete:
@@ -114,7 +126,7 @@ class LeafNode(Splittable, Generic[V]):
         # and the requested tx is older than our buffer's history,
         # we need to search the history index for this tx's value
         if tx < self.history[-1].tx and self.history_offset > 0:
-            return HistoryReadRequest(self.history_offset, tx)
+            return HistoryReadRequest(self.history_offset, tx, value_size=0)
         with self.lock:
             if tx > self.tx and not self.delete:
                 return self.value
@@ -129,7 +141,7 @@ class LeafNode(Splittable, Generic[V]):
                 # This executes if the above break didn't happen
                 if len(self.history) == 0:
                     return None
-                return HistoryReadRequest(self.history_offset, tx)
+                return HistoryReadRequest(self.history_offset, tx, value_size=0)
 
             # This means we have no history and the as_of is asking for before this value
             # was ever set

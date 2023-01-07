@@ -1,19 +1,27 @@
 from threading import RLock
+from typing import Optional
+
 from typing import BinaryIO
 from .types import WriteRequest
+
 
 class InvalidWriteRequest(ValueError):
     ...
 
+
 class IOHandler:
     file: BinaryIO
     lock: RLock
+    page_size: Optional[int]
 
-    def __init__(self: "IOHandler", file: BinaryIO) -> None:
+    def __init__(self: "IOHandler", file: BinaryIO, page_size: Optional[int] = None) -> None:
         self.file = file
         self.lock = RLock()
+        self.page_size = page_size
 
     def write(self: "IOHandler", request: WriteRequest) -> int:
+        if self.page_size is not None:
+            assert len(request.value) == self.page_size
         with self.lock:
             offset = request.offset
             if offset is None:

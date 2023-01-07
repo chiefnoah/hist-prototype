@@ -9,6 +9,8 @@ from typing import (
     cast,
 )
 
+from .searcher import HistorySearcher
+
 
 from .leaf_node import LeafNode, LeafNodeFlags
 from .intermediate_node import IntermediateNode
@@ -21,15 +23,17 @@ class BufferedBTree(Generic[K, V]):
     intermediate_nodes: Deque[IntermediateNode[V]]
     head: IntermediateNode[V]
     current_tx: int
-    history_index: IOHandler
+    history_searcher: HistorySearcher
     data_log: IOHandler
+    index_handler: IOHandler
 
     def __init__(
         self,
         leaf_nodes: Iterable[LeafNode[V]],
         intermediate_nodes: Iterable[IntermediateNode[V]],
-        history_index: IOHandler,
+        history_searcher: HistorySearcher,
         data_log: IOHandler,
+        index_handler: IOHandler,
         tx_epoch: int = 0,
     ):
         self.leaf_nodes = deque(leaf_nodes)
@@ -39,8 +43,9 @@ class BufferedBTree(Generic[K, V]):
 
         self.head = self.intermediate_nodes[0]
         self.tx = tx_epoch
-        self.history_index = history_index
+        self.history_searcher = history_searcher
         self.data_log = data_log
+        self.index_handler = index_handler
 
     # TODO: merge search functionality from put and get into a generic `search` function
     def put(
@@ -64,6 +69,7 @@ class BufferedBTree(Generic[K, V]):
             maybe_leaf = cast(LeafNode[V], maybe_leaf)
             assert isinstance(maybe_leaf, LeafNode)
             # don't do anything with the WriteRequest for now
+            # TODO: handle the resulting write-request
             _ = maybe_leaf.add_record(
                 offset=0, value=value_bytes, tx=self.tx, delete=delete
             )
