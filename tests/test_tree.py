@@ -6,12 +6,13 @@ from unittest.mock import MagicMock, patch
 from typing import List, cast
 
 from hist_prototype.leaf_node import LeafNode
+from hist_prototype.searcher import HistorySearcher
 from hist_prototype.storage import IOHandler
 
 
 @pytest.fixture
 def btree():
-    return BufferedBTree[Bytes, Bytes]([], [], MagicMock(spec=IOHandler), MagicMock(spec=IOHandler))
+    return BufferedBTree[Bytes, Bytes]([], [], MagicMock(spec=HistorySearcher), MagicMock(spec=IOHandler), MagicMock(spec=IOHandler))
 
 
 def test_simple(btree: BufferedBTree[Bytes, Bytes]):
