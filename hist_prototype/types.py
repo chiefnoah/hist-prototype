@@ -20,6 +20,7 @@ V = TypeVar("V", bound=Serializable)
 
 TX = int
 Offset = int
+DataLength = int
 
 # Helper types
 
