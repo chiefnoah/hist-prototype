@@ -10,6 +10,14 @@ from dataclasses import dataclass
 from typing import Tuple, List, Type, ClassVar
 
 
+"""The tuple of flags, tx, offset/data, length/data sets.
+
+If depth > 0 in a node, then the offset and datalength represent the max and min (respectively)
+of the children nodes in the subtree rooted at this node.
+Otherwise, they may represent an offset + length into the datalog or combined
+into a double-word sized raw value. The flags are used to indicate which is the case,
+as well as several reserved bits for future use.
+"""
 ChildTuple = Tuple[int, TX, Offset, DataLength]
 CHILD_TUPLE_SIZE = 1 + 16 + 8 + 8
 
@@ -51,7 +59,6 @@ class HistoryIndexEntry(Serializable):
         seek + read, but it means we're limited to u64 sized records.
         As it's always the "client's" responsibility to ensure the data is interpreted
         properly (probably based on a type map), we don't need to store the type here.
-    The off
     """
     children: List[ChildTuple]
 
@@ -117,7 +124,13 @@ class DataLogEntry(Serializable):
     this may be the case for new keys.
     """
 
-    """The length of this entry. This is serialized as the first 4 bytes of the entry."""
+    """The flags for this entry. This is serialized as the first byte of the entry.
+
+    Right now, only 1 bit is used to indicate whether this entry is a key or a value.
+    """
+    flags: int
+
+    """The length of this entry. This is serialized as the following 8 bytes of the entry."""
     length: int
 
     """The actual data for this entry. This is serialized after the length and must
@@ -125,7 +138,59 @@ class DataLogEntry(Serializable):
     """
     data: bytes
 
-    def serialize(self) -> bytes:
-        raise NotImplementedError()
+    def __post_init__(self) -> None:
+        if len(self.data) != self.length:
+            raise ValueError("Data must be exactly length long.")
 
-    ...
+    def serialize(self) -> bytes:
+        buf = bytearray(self.length + 8 + 1)
+        buf[0:1] = self.flags.to_bytes(1, "little", signed=False)
+        buf[1:9] = self.length.to_bytes(8, "little", signed=False)
+        buf[9:] = self.data
+        return bytes(buf)
+
+    @classmethod
+    def deserialize(cls: "Type[DataLogEntry]", buf: bytes) -> "DataLogEntry":
+        flags = int.from_bytes(buf[0:1], "little", signed=False)
+        length = int.from_bytes(buf[1:9], "little", signed=False)
+        data = buf[9:]
+        return cls(flags=flags, length=length, data=data)
+
+
+@dataclass(frozen=True, slots=True)
+class ValueDataLogEntry(DataLogEntry):
+    """Represents a value entry in the data log."""
+
+    """key_offset points to this values key in the data log."""
+    key_offset: int
+
+    def __post_init__(self) -> None:
+        # Call the super, we also want it's validation
+        # super() for some reason doesn't work here, and I'm too lazy to figure out why
+        DataLogEntry.__post_init__(self)
+        if self.flags | 1 != 1:
+            raise ValueError("Flags must be 1 for a value entry.")
+
+    def serialize(self) -> bytes:
+        buf = bytearray(self.length + 8 + 8 + 1)
+        o = 0
+        buf[o:1] = self.flags.to_bytes(1, "little", signed=False)
+        o += 1
+        buf[o : o + 8] = self.length.to_bytes(8, "little", signed=False)
+        o += 8
+        buf[o : o + 8] = self.key_offset.to_bytes(8, "little", signed=False)
+        o += 8
+        buf[o:] = self.data
+        return bytes(buf)
+
+    @classmethod
+    def deserialize(cls: "Type[ValueDataLogEntry]", buf: bytes) -> "ValueDataLogEntry":
+        o = 0
+        flags = int.from_bytes(buf[o : o + 1], "little", signed=False)
+        o += 1
+        length = int.from_bytes(buf[o : o + 8], "little", signed=False)
+        o += 8
+        key_offset = int.from_bytes(buf[o : o + 8], "little", signed=False)
+        o += 8
+        data = buf[o:]
+        return cls(flags=flags, length=length, key_offset=key_offset, data=data)

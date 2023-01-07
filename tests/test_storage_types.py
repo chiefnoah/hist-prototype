@@ -1,11 +1,16 @@
-from hist_prototype.storage_types import HistoryIndexEntry
+from hist_prototype.storage_types import (
+    HistoryIndexEntry,
+    DataLogEntry,
+    ValueDataLogEntry,
+)
 from hist_prototype.constants import MAX_CHILDREN
 
-def test_roundrip_serialize():
+
+def test_roundrip_serialize_history_index_entry():
     hie = HistoryIndexEntry(
         offset=123,
         depth=3,
-        children=[(1, i, i*2, i*3) for i in range(MAX_CHILDREN)]
+        children=[(1, i, i * 2, i * 3) for i in range(MAX_CHILDREN)],
     )
 
     b = hie.serialize()
@@ -25,5 +30,27 @@ def test_roundrip_serialize():
         assert isinstance(child[2], int)
         assert child[0] == 1
         assert child[1] == i
-        assert child[2] == i*2
-        assert child[3] == i*3
+        assert child[2] == i * 2
+        assert child[3] == i * 3
+
+
+def test_roundtrip_serialize_data_log_entry():
+    dle = DataLogEntry(flags=0, length=110, data=b"hello world" * 10)
+    b = dle.serialize()
+    assert len(b) == 110 + 1 + 8
+
+    ddle = DataLogEntry.deserialize(b)
+
+    assert len(ddle.data) == ddle.length
+
+
+def test_roundtrip_serialize_value_data_log_entry():
+    vdle = ValueDataLogEntry(
+        flags=1, length=110, key_offset=123, data=b"hello world" * 10
+    )
+    b = vdle.serialize()
+    assert len(b) == 110 + 1 + 8 + 8
+
+    dvdle = ValueDataLogEntry.deserialize(b)
+
+    assert len(dvdle.data) == dvdle.length
