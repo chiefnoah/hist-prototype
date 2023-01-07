@@ -19,7 +19,7 @@ def test_roundrip_serialize():
 
     for i, child in enumerate(de_hie.children):
         assert isinstance(child, tuple)
-        assert len(child) == 3
+        assert len(child) == 4
         assert isinstance(child[0], int)
         assert isinstance(child[1], int)
         assert isinstance(child[2], int)
