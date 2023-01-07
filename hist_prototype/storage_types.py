@@ -8,6 +8,7 @@ from .constants import MAX_CHILDREN
 
 from dataclasses import dataclass
 from typing import Tuple, List, Type, ClassVar
+from math import ceil
 
 
 """The tuple of flags, tx, offset/data, length/data sets.
@@ -194,3 +195,36 @@ class ValueDataLogEntry(DataLogEntry):
         o += 8
         data = buf[o:]
         return cls(flags=flags, length=length, key_offset=key_offset, data=data)
+
+
+MainIndexChildren = Tuple[Offset, Offset, DataLength]
+@dataclass(frozen=True, slots=True)
+class MainIndexEntry:
+    """Represents a single entry in the main index.
+
+    The main index contains the offset of the history index entry for a given key or
+    an intermediary node.
+    """
+
+    """The depth of this entry relative to the leave nodes in the tree.
+    
+    If this is 0, this is a leaf node, otherwise it is an intermediate node.
+    """
+    depth: int
+
+    """A single-bit flag for every child entry.
+
+    The bit-length of this field is determined by MAX_CHILDREN.
+    """
+    entry_flags: int
+
+    """Children of this node.
+
+    If this is an intermediate node (depth > 0), the children
+    are pairs of (key_offset, child_node_offset, key_size) triples.
+    If this is a leaf node (depth == 0), the pairs are (key_offset, current_value_offset, value_size) triples.
+    All values in the triples are 64-bit unsigned integers.
+    """
+    children: List[MainIndexChildren]
+
+    SIZE: int = 2 + ceil(MAX_CHILDREN / 8) + MAX_CHILDREN * (8 + 8 + 8)
