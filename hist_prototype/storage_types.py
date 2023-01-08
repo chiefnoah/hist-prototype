@@ -7,9 +7,15 @@ from .types import Serializable, TX, Offset, DataLength
 from .constants import MAX_CHILDREN
 
 from dataclasses import dataclass
-from typing import Tuple, List, Type, ClassVar
+from typing import Tuple, List, Type, ClassVar, Protocol
 from math import ceil
 
+class Sized(Protocol):
+    """A protocol that represents a type that has a `SIZE` attribute.
+    
+    Types that implement this protocol are considered to be "statically sized".
+    """
+    SIZE: ClassVar[int]
 
 """The tuple of flags, tx, offset/data, length/data sets.
 
@@ -24,7 +30,7 @@ CHILD_TUPLE_SIZE = 1 + 16 + 8 + 8
 
 
 @dataclass(frozen=True, slots=True)
-class HistoryIndexEntry(Serializable):
+class HistoryIndexEntry(Serializable, Sized):
     """A simple class that represents an entry in the history index.
 
     Notes
@@ -139,6 +145,7 @@ class DataLogEntry(Serializable):
     """
     data: bytes
 
+
     def __post_init__(self) -> None:
         if len(self.data) != self.length:
             raise ValueError("Data must be exactly length long.")
@@ -199,7 +206,7 @@ class ValueDataLogEntry(DataLogEntry):
 
 MainIndexChildren = Tuple[Offset, Offset, DataLength]
 @dataclass(frozen=True, slots=True)
-class MainIndexEntry:
+class MainIndexEntry(Serializable, Sized):
     """Represents a single entry in the main index.
 
     The main index contains the offset of the history index entry for a given key or
@@ -207,7 +214,7 @@ class MainIndexEntry:
     """
 
     """The depth of this entry relative to the leave nodes in the tree.
-    
+
     If this is 0, this is a leaf node, otherwise it is an intermediate node.
     """
     depth: int
@@ -227,4 +234,41 @@ class MainIndexEntry:
     """
     children: List[MainIndexChildren]
 
-    SIZE: int = 2 + ceil(MAX_CHILDREN / 8) + MAX_CHILDREN * (8 + 8 + 8)
+    # The size of this object when serialized to disk. It's basically constant
+    SIZE: ClassVar[int] = 2 + ceil(MAX_CHILDREN / 8) + MAX_CHILDREN * (8 + 8 + 8)
+    FLAG_SIZE: ClassVar[int] = ceil(MAX_CHILDREN / 8)
+
+    def __post_init__(self) -> None:
+        if len(self.children) != MAX_CHILDREN:
+            raise ValueError("Children must be exactly MAX_CHILDREN long.")
+
+    def serialize(self) -> bytes:
+        buf = bytearray(self.SIZE)
+        o = 0
+        buf[o:o + 2] = self.depth.to_bytes(2, "little", signed=False)
+        o += 2
+        buf[o:o+self.FLAG_SIZE] = self.entry_flags.to_bytes(self.FLAG_SIZE, "little", signed=False)
+        o += self.FLAG_SIZE
+        for i, child in enumerate(self.children):
+            o = (2 * self.FLAG_SIZE) + i * (8 + 8 + 8)
+            buf[o:o+24] = (child[0].to_bytes(8, "little", signed=False) +
+                         child[1].to_bytes(8, "little", signed=False) +
+                         child[2].to_bytes(8, "little", signed=False))
+        return bytes(buf)
+
+    @classmethod
+    def deserialize(cls: "Type[MainIndexEntry]", buf: bytes) -> "MainIndexEntry":
+        assert len(buf) == cls.SIZE
+        o = 0
+        depth = int.from_bytes(buf[o:o+2], "little", signed=False)
+        o += 2
+        entry_flags = int.from_bytes(buf[o:o+cls.FLAG_SIZE], "little", signed=False)
+        o += cls.FLAG_SIZE
+        children: List[MainIndexChildren] = []
+        for i in range(MAX_CHILDREN):
+            o = 2 + cls.FLAG_SIZE + (i * (8 + 8 + 8))
+
+            children.append((int.from_bytes(buf[o:o+8], "little", signed=False),
+                             int.from_bytes(buf[o+8:o+16], "little", signed=False),
+                             int.from_bytes(buf[o+16:o+24], "little", signed=False)))
+        return cls(depth=depth, entry_flags=entry_flags, children=children)

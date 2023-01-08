@@ -42,6 +42,7 @@ def search_intermediate_node(
     node: IntermediateNode[V], search_key: bytes
 ) -> Optional[BTreeNode[V]]:
     """Searches a node's children for a node with the matching search key."""
+    # TODO: use binary search to greatly improve performance
     if len(node.children) == 0:
         return None
     # If the depth is greater than 1, the children will be `BTreeENode`s
