@@ -1,4 +1,4 @@
-"""This file contains type definitions that represent on-disk represntations of data structures.
+"""This file contains type definitions that represent on-disk representations of data structures.
 
 For types that it's relevant, we also include functions for serializing and deserializing them.
 """
