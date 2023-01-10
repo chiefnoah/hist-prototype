@@ -34,3 +34,8 @@ class IOHandler:
             # TODO: raise a better error here
             assert count == size
         return bytes(buf)
+
+    def offset(self) -> int:
+        with self.lock:
+            self.file.seek(-1, 2)
+            return self.file.tell()

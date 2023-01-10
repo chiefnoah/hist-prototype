@@ -62,10 +62,11 @@ class HistoryIndexEntry(Serializable, Sized):
         with the `TX` portion of the triple being the *largest* TX owned
         by a real record in the subtree rooted at the child.
     The flags are primarily used to indicate whether the offset contains a real value
-        or an offset into the data log. Of it's a real value, we can skip the extra
-        seek + read, but it means we're limited to u64 sized records.
-        As it's always the "client's" responsibility to ensure the data is interpreted
-        properly (probably based on a type map), we don't need to store the type here.
+        or an offset into the data log and whether the operation was a delete or not.
+        If it's a real value, we can skip the extra seek + read, but it means
+        we're limited to u64 sized records.  As it's always the "client's"
+        responsibility to ensure the data is interpreted properly (probably
+        based on a type map), we don't need to store the type here.
     """
     children: List[ChildTuple]
 
@@ -213,7 +214,7 @@ class MainIndexEntry(Serializable, Sized):
     an intermediary node.
     """
 
-    """The depth of this entry relative to the leave nodes in the tree.
+    """The depth of this entry relative to the leaf nodes in the tree.
 
     If this is 0, this is a leaf node, otherwise it is an intermediate node.
     """
@@ -229,14 +230,14 @@ class MainIndexEntry(Serializable, Sized):
 
     If this is an intermediate node (depth > 0), the children
     are pairs of (key_offset, child_node_offset, key_size) triples.
-    If this is a leaf node (depth == 0), the pairs are (key_offset, current_value_offset, value_size) triples.
+    If this is a leaf node (depth == 0), the pairs are (tx, current_value_offset, value_size) triples.
     All values in the triples are 64-bit unsigned integers.
     """
     children: List[MainIndexChildren]
 
     # The size of this object when serialized to disk. It's basically constant
-    SIZE: ClassVar[int] = 2 + ceil(MAX_CHILDREN / 8) + MAX_CHILDREN * (8 + 8 + 8)
     FLAG_SIZE: ClassVar[int] = ceil(MAX_CHILDREN / 8)
+    SIZE: ClassVar[int] = 2 + FLAG_SIZE + MAX_CHILDREN * (8 + 8 + 8)
 
     def __post_init__(self) -> None:
         if len(self.children) != MAX_CHILDREN:
